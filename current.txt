@@ -1,0 +1,11 @@
+// cmd:
+// 0. npx prisma init
+// 1. npx prisma generate --clear-cache
+// -- npx prisma format --
+// 2. npx prisma migrate dev --name init
+// -- npx prisma migrate dev --name fix-relations 
+// -- npx prisma migrate deploy
+// -- npx prisma generate --
+// 2. npx prisma migrate reset
+// 3. npx prisma db push 
+// 4. npx prisma db seed

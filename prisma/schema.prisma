@@ -1,0 +1,291 @@
+// Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                Int     @id @default(autoincrement())
+  userId            Int     @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           Int      @id @default(autoincrement())
+  sessionToken String   @unique @map("session_token")
+  userId       Int      @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  phoneNumber   String?   
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  firstName     String?
+  lastName      String?
+  password      String?
+  role          Role      @default(CUSTOMER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  address       String?
+  position      String?
+  company       String?
+  city          String?
+  country       String?   @default("Zambia")
+  province      String?
+  postalAdd     String?
+  isActive      Boolean?
+  avatar        String?
+
+  // Relations
+  accounts Account[]
+  sessions Session[]
+  carts    Cart[]
+
+  Product   Product?  @relation(fields: [productId], references: [id])
+  productId Int?
+  Payment   Payment[]
+  order     Order[]
+  bankCards BankCard[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Payment {
+  id              Int    @id @default(autoincrement())
+  userId          Int
+  orderId         Int
+  amount          Float  @default(0)
+  charge          Float? @default(0.00)
+  txnId           String?
+  photo           String?
+  status          PaymentStatus @default(PENDING)
+  paymentMethod   PaymentMethod @default(CREDITCARD)
+  //createdAt   DateTime @default(now())
+  //updatedAt   DateTime @updatedA
+
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order           Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String
+  products Product[] // One category can have many products
+}
+
+model ProductRating {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  productId Int
+  review    String?
+  rate      Float
+  Product   Product @relation(fields: [productId], references: [id])
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float
+  stock       Int      @default(0)
+  rating      Float?   @default(0)
+  discount    Int?     @default(0)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ratings   ProductRating[]
+  favourite User[]
+  cartItems CartItem[]
+  images    ProductImage[]
+
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  colorCode String
+  name      String
+  media     Media[]   
+
+  stock ProductStock[]  
+
+  product  Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  CartItem CartItem[]
+}
+
+model Media {
+  id                Int          @id @default(autoincrement())
+  url               String
+  cloudinaryImageId String?
+  productImageId    Int
+  productImage      ProductImage @relation(fields: [productImageId], references: [id], onDelete: Cascade)
+}
+
+model ProductStock {
+  id             Int @id @default(autoincrement())
+  stock          Int @default(1)
+  sizeId         Int
+  productImageId Int
+
+  ProductImage ProductImage @relation(fields: [productImageId], references: [id], onDelete: Cascade)
+  size         ProductSize  @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+}
+
+model ProductSize {
+  id    Int     @id @default(autoincrement())
+  size  String
+  range String?
+
+  stock    ProductStock[]
+  CartItem CartItem[]
+}
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+}
+
+model Order {
+  id        Int @id @default(autoincrement())
+  userId    Int?
+
+  email     String
+  firstName String?
+  lastName  String?
+  address   String
+  company   String?
+  city      String
+  country   String
+  province  String
+  postalAdd String
+  phone     String
+  shipping   Float?
+  tax        Int?
+  total      Float
+  orderItems OrderItem[]
+  payment     Payment[]
+  returnRequested Boolean       @default(false)
+  status          OrderStatus   @default(PENDING)
+
+  createdAt       DateTime      @default(now())
+  user            User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OrderItem {
+  id         Int @id @default(autoincrement())
+  orderId    Int
+  cartItemId Int
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cartItem CartItem @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, cartItemId]) // prevents duplicate entries
+}
+
+model CartItem {
+  id             Int  @id @default(autoincrement())
+  cartId         Int?
+  productId      Int
+  productImageId Int
+  sizeId         Int
+  quantity       Int  @default(1)
+
+  cart         Cart?        @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size         ProductSize  @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+  productImage ProductImage @relation(fields: [productImageId], references: [id], onDelete: Cascade)
+
+  OrderItem OrderItem[]
+}
+
+model BankCard {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  cardHolder    String
+  cardNumber    String   @db.VarChar(255) // will be encrypted before saving
+  expiryMonth   Int
+  expiryYear    Int
+  brand         String?  // Visa, Mastercard, etc.
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+
+
+enum Role {
+  CUSTOMER
+  STAFF
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+
+
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDITCARD
+  AIRTELMONEY
+  MTNMONEY
+  ZAMTELKWACHA
+  PAYPAL
+  OTHER
+}
