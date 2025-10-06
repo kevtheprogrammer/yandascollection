@@ -5,41 +5,31 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';  // NextAuth helper for reading JWT tokens
 
 export async function middleware(req: any) {
-    const url = req.nextUrl.clone();
-    const path = url.pathname;
+    const token = (await getToken({
+            req,
+            secret: process.env.AUTH_SECRET,
+            cookieName:
+                process.env.NODE_ENV === "production"
+                    ? "__Secure-authjs.session-token"
+                    : "authjs.session-token",
+        })) as {
+            email: string;
+            role: string;
+            name: string;
+            access: string;
+            id: string;
+        } | null;
 
-    // Allow all non-business and non-client routes (so they don't get affected by middleware)
-    if (!path.startsWith('/business') && !path.startsWith('/client') && !path.startsWith('/checkout')) {
-        return NextResponse.next();
-    }
-
-    
-
-    // Get the JWT token from the request (this contains user info like role)
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
-    // If there is no token (user is not logged in), redirect to signin page
-    if (!token) {
-        url.pathname = '/signin';
-        return NextResponse.redirect(url);
-    }
-
-    // If the user is STAFF, allow access to the /business page
-    if (token.role === 'STAFF') {
-        // Redirect STAFF users to the business section if they try to access /client
-        if (path.startsWith('/client')) {
-            url.pathname = '/business'; // Redirect STAFF to /business
-            return NextResponse.redirect(url);
-        }
-    }
-
-    // If the user is CUSTOMER, allow access to the /client page
-    if (token.role === 'CUSTOMER') {
-        // Redirect CUSTOMER users to the client section if they try to access /business
-        if (path.startsWith('/business')) {
-            url.pathname = '/client'; // Redirect CUSTOMER to /client
-            return NextResponse.redirect(url);
-        }
+    const pathname = req.nextUrl.pathname;
+    const isDashboard = pathname.startsWith("/business");
+    const isCheckout = pathname.startsWith("/checkout");
+    const isProtected = isDashboard || isCheckout;
+ 
+    if (isProtected && !token) {
+        const signInUrl = req.nextUrl.clone();
+        signInUrl.pathname = "/signin";
+        signInUrl.searchParams.set("callbackUrl", pathname); // Add callbackUrl
+        return NextResponse.redirect(signInUrl);
     }
 
     // If user is logged in and has the correct role, continue to the requested route
@@ -50,7 +40,6 @@ export async function middleware(req: any) {
 export const config = {
     matcher: [
         '/business/:path*', // All routes within /business
-        '/client/:path*',    // All routes within /client
         '/checkout/:path*', // All routes within /business
     ],
 };

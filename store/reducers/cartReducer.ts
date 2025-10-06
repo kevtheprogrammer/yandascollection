@@ -29,10 +29,9 @@ const initialState: UserState = {
     total: 0,
 };
  
- 
 export const cartReducer = (state = initialState,  action: Action) => {
     switch (action.type) {
-
+        
         case ActionTypes.SET_CART:
             return { ...state, cart: action.payload, total: calculateTotal(action.payload.items) };
 
